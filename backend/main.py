@@ -1,11 +1,14 @@
-import os
+import json
 import mimetypes
+import os
+import subprocess
+import tempfile
 from typing import Any, Dict, List, Optional
 
 import httpx
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -72,6 +75,15 @@ def _model_supports_quad(model_version: str) -> bool:
     return not version.startswith("P1")
 
 
+def _normalize_upload_type(file_ext: str) -> str:
+    value = (file_ext or "").strip().lower()
+    if value in {"jpg", "jpeg"}:
+        return "jpg"
+    if value in {"png", "webp"}:
+        return value
+    return "jpg"
+
+
 _load_env_file()
 
 TRIPO_API_KEY = os.getenv("TRIPO_API_KEY", "")
@@ -122,6 +134,7 @@ class TaskSummary(BaseModel):
     status: Optional[str] = None
     raw: Dict[str, Any]
     model_urls: List[str] = []
+    viewer_model_urls: List[str] = []
     preview_urls: List[str] = []
 
 
@@ -189,6 +202,27 @@ async def _get_json(path: str) -> Dict[str, Any]:
     return response.json()
 
 
+async def _fetch_binary(url: str) -> Response:
+    if not url.startswith("http://") and not url.startswith("https://"):
+        raise HTTPException(status_code=400, detail="Only http(s) URLs are supported")
+
+    async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT, follow_redirects=True) as client:
+        response = await client.get(url)
+    if response.status_code >= 400:
+        raise HTTPException(status_code=response.status_code, detail=response.text)
+
+    media_type = response.headers.get("content-type", "application/octet-stream")
+    clean_url = url.split("?", 1)[0].lower()
+    guessed_type, _ = mimetypes.guess_type(clean_url)
+    if clean_url.endswith(".glb"):
+        media_type = "model/gltf-binary"
+    elif clean_url.endswith(".gltf"):
+        media_type = "model/gltf+json"
+    elif media_type in {"application/octet-stream", "binary/octet-stream"} and guessed_type:
+        media_type = guessed_type
+    return Response(content=response.content, media_type=media_type)
+
+
 async def _upload_to_tripo(file: UploadFile) -> Dict[str, Any]:
     if not TRIPO_API_KEY:
         raise HTTPException(status_code=500, detail="TRIPO_API_KEY 尚未配置")
@@ -196,17 +230,93 @@ async def _upload_to_tripo(file: UploadFile) -> Dict[str, Any]:
     if not file_ext:
         guessed = mimetypes.guess_extension(file.content_type or "") or ".png"
         file_ext = guessed.replace(".", "")
-    form = {"file": (file.filename or f"upload.{file_ext}", await file.read(), file.content_type or "application/octet-stream")}
+    file_name = file.filename or f"upload.{file_ext}"
+    content_type = file.content_type or "application/octet-stream"
+    file_bytes = await file.read()
+    form = {"file": (file_name, file_bytes, content_type)}
     headers = {"Authorization": f"Bearer {TRIPO_API_KEY}"}
-    async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
-        response = await client.post(f"{TRIPO_BASE_URL}/upload/sts", headers=headers, files=form)
-    if response.status_code >= 400:
-        raise HTTPException(status_code=response.status_code, detail=response.text)
-    data = response.json()
-    file_token = _first_string_by_keys(data, ["file_token", "token"])
-    if not file_token:
-        raise HTTPException(status_code=500, detail=f"未能从上传响应中提取 file_token: {data}")
-    return {"type": file_ext or "png", "file_token": file_token, "raw": data}
+    try:
+        async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
+            response = await client.post(f"{TRIPO_BASE_URL}/upload", headers=headers, files=form)
+    except httpx.HTTPError:
+        data = _upload_to_tripo_via_curl(file_name, file_bytes, content_type)
+    else:
+        if response.status_code >= 400:
+            raise HTTPException(status_code=response.status_code, detail=response.text)
+        data = response.json()
+    token_key = _first_string_by_keys(data, ["image_token", "file_token", "token"])
+    if not token_key:
+        raise HTTPException(status_code=500, detail=f"未能从上传响应中提取可用 token: {data}")
+
+    token_name = "file_token"
+    return {
+        "type": _normalize_upload_type(file_ext),
+        "token_name": token_name,
+        "token_value": token_key,
+        "raw": data,
+        "token_payload": data.get("data") if isinstance(data.get("data"), dict) else {},
+    }
+
+
+def _build_uploaded_file_variants(uploaded: Dict[str, Any]) -> List[Dict[str, Any]]:
+    token_value = uploaded["token_value"]
+    file_type = uploaded["type"]
+    raw_payload = uploaded.get("token_payload") or {}
+    candidates: List[Dict[str, Any]] = []
+
+    def add_candidate(candidate: Dict[str, Any]) -> None:
+        cleaned = {key: value for key, value in candidate.items() if value not in (None, "", False)}
+        if cleaned and cleaned not in candidates:
+            candidates.append(cleaned)
+
+    add_candidate({"type": file_type, "file_token": token_value})
+    add_candidate({"file_token": token_value})
+    add_candidate({"type": file_type, uploaded["token_name"]: token_value})
+    add_candidate({uploaded["token_name"]: token_value})
+    add_candidate({"type": file_type, **raw_payload})
+    add_candidate(raw_payload)
+    add_candidate({"type": file_type, "image_token": token_value})
+    add_candidate({"image_token": token_value})
+    add_candidate({"type": file_type, "url": token_value})
+    add_candidate({"url": token_value})
+
+    return candidates
+
+
+def _upload_to_tripo_via_curl(file_name: str, file_bytes: bytes, content_type: str) -> Dict[str, Any]:
+    suffix = os.path.splitext(file_name)[1] or ".bin"
+    fd, temp_path = tempfile.mkstemp(suffix=suffix)
+    try:
+        with os.fdopen(fd, "wb") as temp_file:
+            temp_file.write(file_bytes)
+
+        result = subprocess.run(
+            [
+                "curl.exe",
+                "-sS",
+                "-X",
+                "POST",
+                f"{TRIPO_BASE_URL}/upload",
+                "-H",
+                f"Authorization: Bearer {TRIPO_API_KEY}",
+                "-F",
+                f"file=@{temp_path};type={content_type}",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=max(int(REQUEST_TIMEOUT), 30),
+            check=False,
+        )
+        if result.returncode != 0:
+            detail = result.stderr.strip() or result.stdout.strip() or "curl upload failed"
+            raise HTTPException(status_code=502, detail=detail)
+        try:
+            return json.loads(result.stdout)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=502, detail=f"Invalid upload response: {result.stdout}") from exc
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
 
 @app.get("/api/health")
@@ -249,6 +359,11 @@ async def set_tripo_key(req: ApiKeySettingsRequest) -> Dict[str, Any]:
 @app.get("/api/tripo/balance")
 async def balance() -> Dict[str, Any]:
     return await _get_json("/user/balance")
+
+
+@app.get("/api/proxy-file")
+async def proxy_file(url: str) -> Response:
+    return await _fetch_binary(url)
 
 
 @app.post("/api/tripo/text-to-model")
@@ -331,12 +446,8 @@ async def image_upload_to_model(
     seed: Optional[int] = Form(None),
 ) -> Dict[str, Any]:
     uploaded = await _upload_to_tripo(file)
-    payload: Dict[str, Any] = {
+    base_payload: Dict[str, Any] = {
         "type": "image_to_model",
-        "file": {
-            "type": uploaded["type"],
-            "file_token": uploaded["file_token"],
-        },
         "negative_prompt": negative_prompt or "",
         "model_version": model_version,
         "face_limit": face_limit,
@@ -345,15 +456,35 @@ async def image_upload_to_model(
         "auto_size": auto_size,
     }
     if quad and _model_supports_quad(model_version):
-        payload["quad"] = True
+        base_payload["quad"] = True
     if style:
-        payload["style"] = style
+        base_payload["style"] = style
     if seed is not None:
-        payload["model_seed"] = seed
+        base_payload["model_seed"] = seed
 
-    data = await _post_json("/task", payload)
-    task_id = _first_string_by_keys(data, ["task_id", "id"])
-    return {"task_id": task_id, "upload": uploaded["raw"], "raw": data}
+    last_exc: Optional[HTTPException] = None
+    for file_payload in _build_uploaded_file_variants(uploaded):
+        payload = {**base_payload, "file": file_payload}
+        try:
+            data = await _post_json("/task", payload)
+            task_id = _first_string_by_keys(data, ["task_id", "id"])
+            return {"task_id": task_id, "upload": uploaded["raw"], "file_payload": file_payload, "raw": data}
+        except HTTPException as exc:
+            if exc.status_code >= 500:
+                raise
+            last_exc = exc
+            continue
+
+    if last_exc is not None:
+        raise HTTPException(
+            status_code=last_exc.status_code,
+            detail={
+                "message": last_exc.detail,
+                "upload": uploaded["raw"],
+                "attempted_file_payloads": _build_uploaded_file_variants(uploaded),
+            },
+        )
+    raise HTTPException(status_code=500, detail="Image upload failed before task submission")
 
 
 @app.get("/api/tripo/tasks/{task_id}", response_model=TaskSummary)
@@ -361,8 +492,16 @@ async def get_task(task_id: str) -> TaskSummary:
     data = await _get_json(f"/task/{task_id}")
     status = _first_string_by_keys(data, ["status"])
     model_urls = _collect_urls(data, ["glb", "obj", "fbx", "stl", "usdz", "3mf", "model", "mesh"])
+    viewer_model_urls = _collect_urls(data, ["glb", "gltf"])
     preview_urls = _collect_urls(data, ["preview", "thumbnail", "render", "image", "gif", "mp4"])
-    return TaskSummary(task_id=task_id, status=status, raw=data, model_urls=model_urls, preview_urls=preview_urls)
+    return TaskSummary(
+        task_id=task_id,
+        status=status,
+        raw=data,
+        model_urls=model_urls,
+        viewer_model_urls=viewer_model_urls,
+        preview_urls=preview_urls,
+    )
 
 
 @app.get("/")
