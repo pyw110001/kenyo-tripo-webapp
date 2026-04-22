@@ -425,6 +425,9 @@
           togglesTitle: "打印导向选项",
           uploadLabel: "上传参考图",
           uploadHint: "图片文件",
+          selectedFile: "已选文件",
+          sourceReady: "图像来源已就绪，可直接提交。",
+          sourceMissing: "请选择本地图片或填写图片 URL。",
           urlLabel: "或填写图片 URL",
           urlHint: "在线图片地址",
           urlPlaceholder: "https://.../reference.png",
@@ -552,6 +555,9 @@
           togglesTitle: "Print-Oriented Options",
           uploadLabel: "Upload Reference Image",
           uploadHint: "Image file",
+          selectedFile: "Selected File",
+          sourceReady: "Image source is ready for submission.",
+          sourceMissing: "Select a local image or enter an image URL.",
           urlLabel: "Or Enter Image URL",
           urlHint: "Remote source",
           urlPlaceholder: "https://.../reference.png",
@@ -999,12 +1005,32 @@
         const textQuadUnsupported = /^P1/i.test((textForm.model_version || "").trim());
         const imageQuadUnsupported = /^P1/i.test((imageForm.model_version || "").trim());
         const previewableModelUrls = useMemo(() => {
+          const explicitUrls = taskDetail?.viewer_model_urls || [];
+          if (explicitUrls.length) {
+            return explicitUrls;
+          }
           const urls = taskDetail?.model_urls || [];
           return urls.filter((url) => {
             const clean = url.split("?")[0].toLowerCase();
-            return clean.endsWith(".glb") || clean.endsWith(".gltf");
+            return (
+              clean.endsWith(".glb") ||
+              clean.endsWith(".gltf") ||
+              url.toLowerCase().includes(".glb") ||
+              url.toLowerCase().includes(".gltf")
+            );
           });
         }, [taskDetail]);
+        const viewerPosterUrl = useMemo(() => {
+          const previews = taskDetail?.preview_urls || [];
+          const imageUrl = previews.find((url) => {
+            const lower = url.toLowerCase();
+            return lower.includes(".png") || lower.includes(".jpg") || lower.includes(".jpeg") || lower.includes(".webp");
+          });
+          return imageUrl ? `/api/proxy-file?url=${encodeURIComponent(imageUrl)}` : "";
+        }, [taskDetail]);
+        const viewerSrc = useMemo(() => {
+          return selectedModelUrl ? `/api/proxy-file?url=${encodeURIComponent(selectedModelUrl)}` : "";
+        }, [selectedModelUrl]);
 
         const statusLabel = useMemo(() => {
           const status = taskDetail?.status;
@@ -1047,6 +1073,15 @@
         const jumpTo = (id) => {
           const node = document.getElementById(id);
           if (node) node.scrollIntoView({ behavior: "smooth", block: "start" });
+        };
+
+        const parseJsonResponse = async (res) => {
+          const text = await res.text();
+          try {
+            return text ? JSON.parse(text) : {};
+          } catch {
+            return { detail: text || "Request failed" };
+          }
         };
 
         const applyTemplate = (item) => {
@@ -1142,7 +1177,12 @@
               formData.append("file", imageFile);
               Object.entries(imageForm).forEach(([key, value]) => {
                 if (key === "image_url") return;
-                formData.append(key, value === "" ? "" : value);
+                if (key === "seed" && (value === "" || value === null || value === undefined)) return;
+                if (typeof value === "boolean") {
+                  formData.append(key, value ? "true" : "false");
+                  return;
+                }
+                formData.append(key, `${value}`);
               });
               res = await fetch("/api/tripo/image-upload-to-model", { method: "POST", body: formData });
             } else {
@@ -1158,13 +1198,15 @@
               });
             }
 
-            const data = await res.json();
+            const data = await parseJsonResponse(res);
             if (!res.ok) throw new Error(data.detail || "Submit failed");
             setTaskId(data.task_id || "");
             setMessage(L.messageImageSubmitted);
+            jumpTo("results");
             if (data.task_id) await pollTask(data.task_id);
           } catch (err) {
             setMessage(err.message || "Submit failed");
+            jumpTo("results");
           } finally {
             setBusy(false);
           }
@@ -1436,17 +1478,45 @@
                               type="file"
                               accept="image/*"
                               className="cyber-file"
-                              onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0] || null;
+                                setImageFile(file);
+                                if (file) {
+                                  setImageForm((value) => ({ ...value, image_url: "" }));
+                                }
+                              }}
                             />
                           </Field>
                           <Field label={L.urlLabel} hint={L.urlHint}>
                             <input
                               className="cyber-input"
                               value={imageForm.image_url}
-                              onChange={(e) => setImageForm((value) => ({ ...value, image_url: e.target.value }))}
+                              onChange={(e) => {
+                                const nextUrl = e.target.value;
+                                setImageForm((value) => ({ ...value, image_url: nextUrl }));
+                                if (nextUrl.trim()) {
+                                  setImageFile(null);
+                                }
+                              }}
                               placeholder={L.urlPlaceholder}
                             />
                           </Field>
+                        </div>
+
+                        <div className="rounded-[1.15rem] border border-white/8 bg-white/[0.03] px-4 py-4 text-sm leading-7 text-white/60">
+                          {imageFile ? (
+                            <div>
+                              <span className="text-white/34">{L.selectedFile}:</span>
+                              <span className="ml-2 text-cyan-100/88">{imageFile.name}</span>
+                            </div>
+                          ) : imageForm.image_url.trim() ? (
+                            <div className="break-all text-cyan-100/88">{imageForm.image_url}</div>
+                          ) : (
+                            <div>{L.sourceMissing}</div>
+                          )}
+                          {(imageFile || imageForm.image_url.trim()) ? (
+                            <div className="mt-1 text-xs text-white/42">{L.sourceReady}</div>
+                          ) : null}
                         </div>
 
                         <Field label={L.negativeLabel} hint={L.negativeHint}>
@@ -1626,7 +1696,9 @@
                               </div>
                               <div className="h-[360px]">
                                 <model-viewer
-                                  src={selectedModelUrl}
+                                  key={viewerSrc}
+                                  src={viewerSrc}
+                                  poster={viewerPosterUrl || undefined}
                                   camera-controls
                                   touch-action="pan-y"
                                   auto-rotate
