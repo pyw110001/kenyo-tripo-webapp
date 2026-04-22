@@ -1,0 +1,1707 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KENYO · Tripo3D</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700;800&family=Orbitron:wght@500;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["Noto Sans SC", "sans-serif"],
+              display: ["Orbitron", "Noto Sans SC", "sans-serif"],
+            },
+            boxShadow: {
+              glow: "0 0 32px rgba(136, 247, 255, 0.24)",
+              panel: "0 28px 80px rgba(0, 0, 0, 0.5)",
+            },
+          },
+        },
+      };
+    </script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+      :root {
+        color-scheme: dark;
+        --text: rgba(236, 246, 255, 0.96);
+        --muted: rgba(195, 214, 232, 0.56);
+        --line: rgba(145, 236, 255, 0.14);
+        --line-strong: rgba(145, 236, 255, 0.28);
+        --neon: #89f7ff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--text);
+        font-family: "Noto Sans SC", sans-serif;
+        background:
+          radial-gradient(circle at 14% 18%, rgba(20, 86, 166, 0.22), transparent 24%),
+          radial-gradient(circle at 82% 12%, rgba(118, 246, 255, 0.12), transparent 18%),
+          radial-gradient(circle at 76% 64%, rgba(54, 100, 255, 0.16), transparent 26%),
+          linear-gradient(180deg, #020409 0%, #050913 32%, #06101d 64%, #02050b 100%);
+        overflow-x: hidden;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background:
+          linear-gradient(rgba(124, 228, 255, 0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(124, 228, 255, 0.035) 1px, transparent 1px);
+        background-size: 72px 72px;
+        mask-image: radial-gradient(circle at center, black 42%, transparent 88%);
+        opacity: 0.52;
+      }
+
+      body::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background:
+          linear-gradient(180deg, transparent 0%, rgba(255, 255, 255, 0.02) 48%, transparent 100%),
+          repeating-linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.014) 0,
+            rgba(255, 255, 255, 0.014) 1px,
+            transparent 1px,
+            transparent 4px
+          );
+        mix-blend-mode: screen;
+        opacity: 0.22;
+      }
+
+      .panel-glass {
+        background:
+          linear-gradient(180deg, rgba(9, 21, 36, 0.78), rgba(5, 10, 18, 0.72)),
+          linear-gradient(120deg, rgba(255, 255, 255, 0.04), transparent 40%);
+        border: 1px solid var(--line);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.05),
+          0 24px 80px rgba(0, 0, 0, 0.45),
+          0 0 0 1px rgba(255, 255, 255, 0.015);
+        backdrop-filter: blur(24px) saturate(140%);
+      }
+
+      .glow-frame {
+        position: relative;
+        overflow: hidden;
+      }
+
+      .glow-frame::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        padding: 1px;
+        border-radius: inherit;
+        background: linear-gradient(135deg, rgba(161, 247, 255, 0.4), rgba(22, 59, 110, 0.16), rgba(161, 247, 255, 0.22));
+        -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+        -webkit-mask-composite: xor;
+        mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+        mask-composite: exclude;
+        pointer-events: none;
+      }
+
+      .cyber-input,
+      .cyber-textarea,
+      .cyber-file {
+        width: 100%;
+        border-radius: 1.25rem;
+        border: 1px solid rgba(138, 247, 255, 0.11);
+        background:
+          linear-gradient(180deg, rgba(7, 14, 24, 0.92), rgba(4, 8, 16, 0.84)),
+          linear-gradient(135deg, rgba(150, 247, 255, 0.03), transparent 34%);
+        color: rgba(239, 251, 255, 0.96);
+        outline: none;
+        transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      }
+
+      .cyber-input,
+      .cyber-file {
+        min-height: 56px;
+        padding: 0.95rem 1rem;
+      }
+
+      .cyber-textarea {
+        min-height: 132px;
+        padding: 1rem;
+        resize: vertical;
+      }
+
+      .cyber-input:hover,
+      .cyber-input:focus,
+      .cyber-textarea:hover,
+      .cyber-textarea:focus,
+      .cyber-file:hover,
+      .cyber-file:focus {
+        border-color: rgba(138, 247, 255, 0.34);
+        box-shadow: 0 0 0 1px rgba(138, 247, 255, 0.16), 0 0 28px rgba(138, 247, 255, 0.08);
+      }
+
+      .cyber-input::placeholder,
+      .cyber-textarea::placeholder {
+        color: rgba(180, 210, 230, 0.34);
+      }
+
+      .cyber-file::file-selector-button {
+        margin-right: 14px;
+        border: 1px solid rgba(138, 247, 255, 0.2);
+        border-radius: 999px;
+        background: rgba(136, 247, 255, 0.08);
+        color: rgba(210, 252, 255, 0.92);
+        padding: 0.65rem 1rem;
+        cursor: pointer;
+      }
+
+      .particle {
+        position: absolute;
+        border-radius: 999px;
+        background: radial-gradient(circle, rgba(174, 250, 255, 0.95) 0%, rgba(174, 250, 255, 0.18) 42%, transparent 78%);
+        box-shadow: 0 0 12px rgba(140, 248, 255, 0.22);
+        opacity: 0.62;
+        animation-name: drift;
+        animation-timing-function: ease-in-out;
+        animation-iteration-count: infinite;
+      }
+
+      .blueprint-grid {
+        background-image:
+          linear-gradient(rgba(137, 247, 255, 0.05) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(137, 247, 255, 0.05) 1px, transparent 1px);
+        background-size: 28px 28px;
+      }
+
+      .hero-ring,
+      .hero-core,
+      .hero-scan {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      .hero-ring::before,
+      .hero-ring::after {
+        content: "";
+        position: absolute;
+        inset: 12% 18%;
+        border: 1px solid rgba(135, 246, 255, 0.16);
+        border-radius: 999px;
+        transform: perspective(900px) rotateX(75deg);
+        box-shadow: 0 0 50px rgba(136, 247, 255, 0.08);
+      }
+
+      .hero-ring::after {
+        inset: 22% 8%;
+        transform: perspective(1000px) rotateX(76deg) rotateZ(-12deg);
+        border-color: rgba(61, 126, 255, 0.18);
+      }
+
+      .hero-core::before,
+      .hero-core::after {
+        content: "";
+        position: absolute;
+        border-radius: 999px;
+      }
+
+      .hero-core::before {
+        inset: 26% 30%;
+        background: radial-gradient(circle, rgba(166, 250, 255, 0.28), rgba(26, 84, 206, 0.08) 56%, transparent 72%);
+        filter: blur(2px);
+        animation: pulseGlow 5.2s ease-in-out infinite;
+      }
+
+      .hero-core::after {
+        inset: 38% 37%;
+        background: radial-gradient(circle, rgba(205, 255, 255, 0.9), rgba(106, 251, 255, 0.24) 42%, transparent 66%);
+        box-shadow: 0 0 42px rgba(136, 247, 255, 0.32);
+        animation: coreBreath 3.2s ease-in-out infinite;
+      }
+
+      .hero-scan::before {
+        content: "";
+        position: absolute;
+        left: 8%;
+        right: 8%;
+        top: 12%;
+        height: 18%;
+        background: linear-gradient(180deg, transparent, rgba(131, 247, 255, 0.2), transparent);
+        filter: blur(14px);
+        animation: scanSweep 7.5s linear infinite;
+      }
+
+      .hero-wire {
+        position: absolute;
+        inset: 0;
+        opacity: 0.94;
+      }
+
+      .hero-wire polygon,
+      .hero-wire path,
+      .hero-wire circle,
+      .hero-wire polyline {
+        fill: rgba(7, 20, 35, 0.08);
+        stroke: rgba(138, 247, 255, 0.72);
+        stroke-width: 1;
+      }
+
+      .hero-wire .dim {
+        stroke: rgba(75, 143, 255, 0.38);
+      }
+
+      .hero-wire .glow {
+        filter: drop-shadow(0 0 10px rgba(136, 247, 255, 0.3));
+      }
+
+      .result-scroll::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+      }
+
+      .result-scroll::-webkit-scrollbar-thumb {
+        background: rgba(137, 247, 255, 0.2);
+        border-radius: 999px;
+      }
+
+      .result-scroll::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      model-viewer {
+        width: 100%;
+        height: 100%;
+        --progress-bar-color: #89f7ff;
+        --progress-mask: transparent;
+        background:
+          radial-gradient(circle at 50% 32%, rgba(119, 246, 255, 0.1), transparent 34%),
+          linear-gradient(180deg, rgba(8, 18, 31, 0.96), rgba(4, 8, 16, 0.92));
+      }
+
+      @keyframes drift {
+        0%, 100% {
+          transform: translate3d(0, 0, 0) scale(0.86);
+          opacity: 0.3;
+        }
+        50% {
+          transform: translate3d(0, -14px, 0) scale(1.05);
+          opacity: 0.78;
+        }
+      }
+
+      @keyframes pulseGlow {
+        0%, 100% {
+          transform: scale(0.96);
+          opacity: 0.48;
+        }
+        50% {
+          transform: scale(1.05);
+          opacity: 0.9;
+        }
+      }
+
+      @keyframes coreBreath {
+        0%, 100% {
+          transform: scale(0.92);
+        }
+        50% {
+          transform: scale(1.12);
+        }
+      }
+
+      @keyframes scanSweep {
+        0% {
+          transform: translateY(-36%);
+          opacity: 0;
+        }
+        12% {
+          opacity: 0.95;
+        }
+        90% {
+          opacity: 0.6;
+        }
+        100% {
+          transform: translateY(360%);
+          opacity: 0;
+        }
+      }
+
+      @media (max-width: 768px) {
+        body::before {
+          background-size: 42px 42px;
+          opacity: 0.34;
+        }
+      }
+    </style>
+  </head>
+  <body class="min-h-screen text-white">
+    <div id="root"></div>
+    <script type="text/babel">
+      const { useEffect, useMemo, useState } = React;
+
+      const copy = {
+        zh: {
+          statusReady: "已配置",
+          statusNeedKey: "待配置",
+          langZh: "中文",
+          langEn: "EN",
+          heroTag: "KENYO TRIPO3D",
+          heroTitle1: "极简赛博",
+          heroTitle2: "建筑生成控制台",
+          heroDesc:
+            "聚焦生成、转模与结果验证的双语工作台。",
+          heroPrimary: "进入工作台",
+          heroSecondary: "查看结果",
+          keyEyebrow: "KEY ACCESS",
+          keyTitle: "连接 TRIPO 3D",
+          keyDesc: "输入你的 API Key 后即可直接在当前应用内使用，保存后会保留在本地配置中。",
+          keyLabel: "TRIPO 3D API Key",
+          keyPlaceholder: "输入 tsk_...",
+          keySave: "保存 Key",
+          keySaving: "保存中...",
+          keyStored: "当前已保存",
+          keyNotSet: "未配置",
+          keyHint: "留空后保存可清除当前 Key。",
+          keyFormatWarning: "当前保存的 Key 前缀不像标准 Tripo OpenAPI Key，建议改用以 tsk_ 开头的 API Key。",
+          templatesEyebrow: "TEMPLATE PRESETS",
+          templatesTitle: "快捷模板",
+          notesEyebrow: "WORKFLOW NOTES",
+          notesTitle: "参考提示",
+          tipsToggle: "展开提示",
+          presetsToggle: "展开模板",
+          notes: [
+            "保持提示词短句、强约束，更适合建筑打印测试。",
+            "草图、白模、单体建筑参考图通常比复杂场景更稳定。",
+            "可先生成参考图，再切换到图生 3D 做结构验证。",
+          ],
+          tabs: {
+            text: "文生 3D",
+            image: "图生 3D",
+            imagegen: "文生图参考图",
+          },
+          tabDesc: {
+            text: "从文本约束直接生成体块",
+            image: "从草图或参考图投喂建模",
+            imagegen: "先出概念图再转模型",
+          },
+          textEyebrow: "TEXT TO 3D",
+          textTitle: "从文本直接生成建筑体块",
+          textDesc: "直接用文本生成可打印体块。",
+          imageEyebrow: "IMAGE TO 3D",
+          imageTitle: "从参考图驱动模型重建",
+          imageDesc: "从草图或参考图快速转为模型。",
+          imageGenEyebrow: "REFERENCE IMAGE",
+          imageGenTitle: "先生成参考图，再接图生 3D",
+          imageGenDesc: "先生成参考图，再继续转模。",
+          promptLabel: "Prompt",
+          promptHint: "短句 / 强约束 / 可打印",
+          negativeLabel: "Negative Prompt",
+          negativeHint: "排除脆弱细节",
+          modelVersion: "Model Version",
+          faceLimit: "Face Limit",
+          seed: "Seed",
+          seedPlaceholder: "留空为随机",
+          togglesTitle: "打印导向选项",
+          uploadLabel: "上传参考图",
+          uploadHint: "图片文件",
+          urlLabel: "或填写图片 URL",
+          urlHint: "在线图片地址",
+          urlPlaceholder: "https://.../reference.png",
+          submitText: "提交文生 3D",
+          submitImage: "提交图生 3D",
+          submitImageGen: "提交文生图任务",
+          busy: "提交中...",
+          toggleTexture: "贴图 Texture",
+          togglePbr: "PBR 材质",
+          toggleAutoSize: "Auto Size",
+          toggleQuad: "Quad 拓扑",
+          quadUnsupported: "P1 模型暂不支持 Quad，已自动关闭。",
+          textGuideTitle: "推荐输入策略",
+          textGuideItems: [
+            "低面数、连续体块、少装饰，更适合作为打印测试输入。",
+            "建议优先包含 monolithic、printable、low-poly、thick walls 等约束。",
+            "这类输出更适合验证几何逻辑，而不是做最终写实渲染。",
+          ],
+          imageGuideTitle: "参考图建议",
+          imageGuideItems: [
+            "草图、白模、单体建筑参考图比复杂街景更稳定。",
+            "尽量避免杂乱背景、遮挡与过度透视。",
+            "如果没有现成图像，可以先走文生图链路。",
+          ],
+          imageGenGuideTitle: "建议工作流",
+          imageGenGuideItems: [
+            "先生成一张体块明确、材质克制的参考图。",
+            "从中挑选最稳定的一张作为图生 3D 输入。",
+            "这条链路适合从概念阶段快速过渡到几何测试阶段。",
+          ],
+          resultsEyebrow: "MISSION OUTPUT",
+          resultsTitle: "任务状态与输出资源",
+          resultsDesc: "集中查看任务、预览与模型资源。",
+          taskId: "任务 ID",
+          status: "状态",
+          feedback: "反馈信息",
+          refresh: "刷新状态",
+          preview: "预览资源",
+          models: "模型资源",
+          viewer: "3D 模型预览",
+          viewerDesc: "支持直接旋转与缩放查看。",
+          viewerEmpty: "当前没有可直接预览的 3D 模型。若返回的是 GLB / GLTF，预览窗口会自动显示。",
+          viewerHint: "拖动旋转，滚轮缩放",
+          previewModel: "预览模型",
+          openPreview: "打开预览",
+          downloadModel: "下载模型",
+          jsonTitle: "原始 JSON 响应",
+          noOutput: "当前还没有可展示的任务输出。提交任意任务后，结果会自动出现在这里。",
+          idle: "待命",
+          running: "生成中",
+          success: "任务完成",
+          failed: "任务失败",
+          messageSaveSuccess: "API Key 已保存并立即生效。",
+          messageSaveCleared: "API Key 已清除。",
+          messageSaveError: "保存 API Key 失败。",
+          messageTemplateText: "已应用文生 3D 模板，可继续微调后提交。",
+          messageTemplateImage: "已切换到图生 3D，请上传参考图或填入图片 URL。",
+          messageTemplateImageGen: "已切换到文生图参考链路，可先生成中间参考图。",
+          messageTextSubmitted: "文生 3D 任务已提交，系统正在同步状态。",
+          messageImageSubmitted: "图生 3D 任务已启动，参考图已接入建模链路。",
+          messageImageGenSubmitted: "文生图任务已提交，可将产出的图像继续用于图生 3D。",
+          messageImageSourceMissing: "请先上传参考图，或填写可访问的图片 URL。",
+        },
+        en: {
+          statusReady: "Ready",
+          statusNeedKey: "Key Needed",
+          langZh: "中文",
+          langEn: "EN",
+          heroTag: "KENYO TRIPO3D",
+          heroTitle1: "Minimal Cyber",
+          heroTitle2: "Architecture Console",
+          heroDesc:
+            "A bilingual workspace focused on generation, conversion, and result review.",
+          heroPrimary: "Open Workspace",
+          heroSecondary: "View Results",
+          keyEyebrow: "KEY ACCESS",
+          keyTitle: "Connect TRIPO 3D",
+          keyDesc: "Enter your API key to use Tripo directly in this app. Once saved, it stays in the local app configuration.",
+          keyLabel: "TRIPO 3D API Key",
+          keyPlaceholder: "Enter tsk_...",
+          keySave: "Save Key",
+          keySaving: "Saving...",
+          keyStored: "Saved Key",
+          keyNotSet: "Not Set",
+          keyHint: "Save an empty value to clear the current key.",
+          keyFormatWarning: "The saved key prefix does not look like a standard Tripo OpenAPI key. Try an API key starting with tsk_.",
+          templatesEyebrow: "TEMPLATE PRESETS",
+          templatesTitle: "Quick Templates",
+          notesEyebrow: "WORKFLOW NOTES",
+          notesTitle: "Quick Tips",
+          tipsToggle: "Show Tips",
+          presetsToggle: "Show Presets",
+          notes: [
+            "Short and constrained prompts usually work better for printable architectural studies.",
+            "Sketches, white models, and isolated building references are more stable than busy scenes.",
+            "Generate a reference image first if you want a cleaner image-to-3D workflow.",
+          ],
+          tabs: {
+            text: "Text to 3D",
+            image: "Image to 3D",
+            imagegen: "Reference Image",
+          },
+          tabDesc: {
+            text: "Create a massing study from text constraints",
+            image: "Feed a sketch or reference image into the modeling flow",
+            imagegen: "Generate a concept image before converting it to 3D",
+          },
+          textEyebrow: "TEXT TO 3D",
+          textTitle: "Generate architectural massing from text",
+          textDesc: "Generate printable massing directly from text.",
+          imageEyebrow: "IMAGE TO 3D",
+          imageTitle: "Rebuild geometry from a reference image",
+          imageDesc: "Turn sketches or references into 3D quickly.",
+          imageGenEyebrow: "REFERENCE IMAGE",
+          imageGenTitle: "Generate a reference image before image-to-3D",
+          imageGenDesc: "Create a reference image before converting it.",
+          promptLabel: "Prompt",
+          promptHint: "Short / constrained / printable",
+          negativeLabel: "Negative Prompt",
+          negativeHint: "Avoid fragile details",
+          modelVersion: "Model Version",
+          faceLimit: "Face Limit",
+          seed: "Seed",
+          seedPlaceholder: "Leave blank for random",
+          togglesTitle: "Print-Oriented Options",
+          uploadLabel: "Upload Reference Image",
+          uploadHint: "Image file",
+          urlLabel: "Or Enter Image URL",
+          urlHint: "Remote source",
+          urlPlaceholder: "https://.../reference.png",
+          submitText: "Submit Text to 3D",
+          submitImage: "Submit Image to 3D",
+          submitImageGen: "Submit Text to Image",
+          busy: "Submitting...",
+          toggleTexture: "Texture",
+          togglePbr: "PBR",
+          toggleAutoSize: "Auto Size",
+          toggleQuad: "Quad",
+          quadUnsupported: "Quad is not supported for P1 models and has been turned off automatically.",
+          textGuideTitle: "Recommended Input Strategy",
+          textGuideItems: [
+            "Low polygon count, continuous volumes, and fewer ornaments are better for print test workflows.",
+            "Use constraints like monolithic, printable, low-poly, and thick walls whenever possible.",
+            "These outputs are better for validating geometry than for final photoreal rendering.",
+          ],
+          imageGuideTitle: "Reference Suggestions",
+          imageGuideItems: [
+            "Sketches, white models, and isolated building references are usually more stable than complex streetscapes.",
+            "Avoid cluttered backgrounds, occlusion, and extreme perspective distortion.",
+            "If you do not have a clean source image yet, start with the reference-image flow.",
+          ],
+          imageGenGuideTitle: "Suggested Workflow",
+          imageGenGuideItems: [
+            "Generate a restrained concept image with clear massing first.",
+            "Pick the cleanest result and feed it into Image to 3D next.",
+            "This flow is useful when moving from concept phase to geometry validation quickly.",
+          ],
+          resultsEyebrow: "MISSION OUTPUT",
+          resultsTitle: "Task status and generated assets",
+          resultsDesc: "Review tasks, previews, and model assets here.",
+          taskId: "Task ID",
+          status: "Status",
+          feedback: "Feedback",
+          refresh: "Refresh Status",
+          preview: "Preview Assets",
+          models: "Model Assets",
+          viewer: "3D Model Viewer",
+          viewerDesc: "Rotate and zoom the model here.",
+          viewerEmpty: "No directly previewable 3D model is available yet. If the task returns GLB / GLTF, the viewer will appear automatically.",
+          viewerHint: "Drag to orbit, scroll to zoom",
+          previewModel: "Preview Model",
+          openPreview: "Open Preview",
+          downloadModel: "Download Model",
+          jsonTitle: "Raw JSON Response",
+          noOutput: "No task output is available yet. Submit any workflow and the results will appear here automatically.",
+          idle: "Idle",
+          running: "Running",
+          success: "Completed",
+          failed: "Failed",
+          messageSaveSuccess: "The API key has been saved and is active now.",
+          messageSaveCleared: "The API key has been cleared.",
+          messageSaveError: "Failed to save the API key.",
+          messageTemplateText: "The Text to 3D template is applied. You can refine it before submitting.",
+          messageTemplateImage: "Switched to Image to 3D. Upload a reference image or provide an image URL.",
+          messageTemplateImageGen: "Switched to the reference-image workflow. Generate an intermediate image first if needed.",
+          messageTextSubmitted: "The Text to 3D task has been submitted and the app is syncing its status.",
+          messageImageSubmitted: "The Image to 3D task has started and the reference image is now in the modeling flow.",
+          messageImageGenSubmitted: "The image generation task has been submitted. You can reuse the result for Image to 3D.",
+          messageImageSourceMissing: "Please upload a reference image or provide an accessible image URL first.",
+        },
+      };
+
+      const promptTemplates = [
+        {
+          name: { zh: "极简混凝土小屋体块", en: "Minimal Concrete Pavilion" },
+          type: "text",
+          prompt:
+            "minimal concrete pavilion massing, single-storey architectural prototype, smooth continuous shell, low-poly printable geometry, thick walls, no tiny ornament, stable footprint, suitable for concrete 3d printing test",
+          negative:
+            "glass curtain wall, thin cantilever, tiny railings, trees, people, furniture, ultra detailed facade, text",
+        },
+        {
+          name: { zh: "参数化穿孔墙测试件", en: "Parametric Perforated Wall" },
+          type: "text",
+          prompt:
+            "architectural perforated concrete wall module, rhythmic openings, simplified printable geometry, strong load-bearing appearance, modular test specimen for concrete 3d printing",
+          negative: "fragile thin edges, metal frame, plants, people, excessive detail",
+        },
+        {
+          name: { zh: "曲面景观座椅测试块", en: "Curved Landscape Bench" },
+          type: "text",
+          prompt:
+            "curved concrete landscape bench prototype, monolithic massing, printable low-poly form, soft continuous geometry, no small details, suitable for concrete 3d printing path planning",
+          negative: "fabric cushions, wood slats, fine decorative pattern, text",
+        },
+        {
+          name: { zh: "薄壳亭结构概念", en: "Thin-Shell Pavilion Concept" },
+          type: "text",
+          prompt:
+            "thin shell pavilion concept with simplified structural ribs, architectural study model, robust geometry, low polygon, suitable for 3d printed concrete prototype",
+          negative: "complex truss, cables, glass panels, intricate joints",
+        },
+        {
+          name: { zh: "参考图转建筑体块", en: "Reference Image to Massing" },
+          type: "image",
+          prompt:
+            "upload a massing sketch, façade reference, CAD linework screenshot, or physical model photo, then convert to simplified printable architectural geometry",
+          negative: "avoid over-texturing, avoid fragile parts, avoid tiny facade decoration",
+        },
+        {
+          name: { zh: "文字先出参考图再转模型", en: "Generate Reference Before 3D" },
+          type: "imagegen",
+          prompt:
+            "generate a simple architectural concept image first, then use it as reference for image-to-model testing; emphasize monolithic concrete, low detail, printable silhouette",
+          negative: "complex city background, crowds, overly photoreal material",
+        },
+      ];
+
+      const defaultTextPrompt = promptTemplates[0].prompt;
+      const defaultNegative = promptTemplates[0].negative;
+
+      function cn(...parts) {
+        return parts.filter(Boolean).join(" ");
+      }
+
+      function randomParticles() {
+        return Array.from({ length: 28 }, (_, index) => ({
+          id: index,
+          x: Math.random() * 100,
+          y: Math.random() * 100,
+          size: Math.random() * 3.2 + 1,
+          duration: Math.random() * 10 + 8,
+          delay: Math.random() * 8,
+        }));
+      }
+
+      function ParticleField({ particles }) {
+        return (
+          <div className="pointer-events-none fixed inset-0 overflow-hidden">
+            {particles.map((particle) => (
+              <span
+                key={particle.id}
+                className="particle"
+                style={{
+                  left: `${particle.x}%`,
+                  top: `${particle.y}%`,
+                  width: `${particle.size}px`,
+                  height: `${particle.size}px`,
+                  animationDuration: `${particle.duration}s`,
+                  animationDelay: `-${particle.delay}s`,
+                }}
+              />
+            ))}
+          </div>
+        );
+      }
+
+      function StatusPill({ label }) {
+        return (
+          <span className="inline-flex items-center rounded-full border border-cyan-300/24 bg-cyan-300/10 px-3 py-1 text-xs uppercase tracking-[0.24em] text-cyan-100">
+            {label}
+          </span>
+        );
+      }
+
+      function LanguageToggle({ lang, setLang, L }) {
+        return (
+          <div className="inline-flex rounded-full border border-white/10 bg-white/[0.04] p-1">
+            <button
+              onClick={() => setLang("zh")}
+              className={cn(
+                "rounded-full px-4 py-2 text-xs font-medium uppercase tracking-[0.24em] transition",
+                lang === "zh" ? "bg-cyan-300/16 text-cyan-50 shadow-glow" : "text-white/48 hover:text-white/86"
+              )}
+            >
+              {L.langZh}
+            </button>
+            <button
+              onClick={() => setLang("en")}
+              className={cn(
+                "rounded-full px-4 py-2 text-xs font-medium uppercase tracking-[0.24em] transition",
+                lang === "en" ? "bg-cyan-300/16 text-cyan-50 shadow-glow" : "text-white/48 hover:text-white/86"
+              )}
+            >
+              {L.langEn}
+            </button>
+          </div>
+        );
+      }
+
+      function TemplateCard({ item, onApply, lang, active }) {
+        return (
+          <button
+            onClick={() => onApply(item)}
+            className={cn(
+              "group relative w-full overflow-hidden rounded-[1.35rem] border px-4 py-4 text-left transition",
+              active
+                ? "border-cyan-300/28 bg-cyan-300/10 shadow-glow"
+                : "border-white/8 bg-white/[0.03] hover:border-cyan-300/18 hover:bg-white/[0.045]"
+            )}
+          >
+            <div className="absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-cyan-200/70 to-transparent opacity-0 transition group-hover:opacity-100" />
+            <div className="flex items-start justify-between gap-3">
+              <div className="pr-2">
+                <div className="text-sm font-medium text-white/92">{item.name[lang]}</div>
+                <div className="mt-2 text-xs leading-6 text-white/44">
+                  {item.prompt.length > 96 ? `${item.prompt.slice(0, 96)}...` : item.prompt}
+                </div>
+              </div>
+              <span className="shrink-0 rounded-full border border-cyan-300/18 bg-cyan-300/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.28em] text-cyan-100">
+                {item.type}
+              </span>
+            </div>
+          </button>
+        );
+      }
+
+      function CollapsiblePanel({ title, eyebrow, buttonLabel, children, defaultOpen = false }) {
+        const [open, setOpen] = useState(defaultOpen);
+        return (
+          <div className="rounded-[1.8rem] panel-glass glow-frame p-5">
+            <button
+              type="button"
+              onClick={() => setOpen((value) => !value)}
+              className="flex w-full items-center justify-between gap-4 text-left"
+            >
+              <div>
+                <div className="font-display text-xs uppercase tracking-[0.38em] text-cyan-100/70">{eyebrow}</div>
+                <div className="mt-3 text-xl text-white/90">{title}</div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="hidden text-[11px] uppercase tracking-[0.24em] text-white/36 sm:inline">{buttonLabel}</span>
+                <span className={cn("text-lg text-cyan-100 transition", open ? "rotate-45" : "")}>+</span>
+              </div>
+            </button>
+            {open ? <div className="mt-5">{children}</div> : null}
+          </div>
+        );
+      }
+
+      function Field({ label, hint, children }) {
+        return (
+          <label className="block">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <span className="text-sm font-medium text-white/88">{label}</span>
+              {hint ? <span className="text-[11px] uppercase tracking-[0.22em] text-white/36">{hint}</span> : null}
+            </div>
+            {children}
+          </label>
+        );
+      }
+
+      function ToggleTile({ label, checked, onChange }) {
+        return (
+          <label
+            className={cn(
+              "flex cursor-pointer items-center justify-between gap-3 rounded-[1.1rem] border px-4 py-3 text-sm transition",
+              checked
+                ? "border-cyan-300/28 bg-cyan-300/10 text-cyan-50 shadow-[0_0_20px_rgba(136,247,255,0.08)]"
+                : "border-white/8 bg-white/[0.03] text-white/62 hover:border-cyan-300/18 hover:text-white/82"
+            )}
+          >
+            <span>{label}</span>
+            <span className="relative inline-flex h-6 w-11 items-center rounded-full border border-white/10 bg-black/40 px-0.5">
+              <span
+                className={cn(
+                  "h-[18px] w-[18px] rounded-full bg-white/80 shadow-[0_0_12px_rgba(255,255,255,0.3)] transition",
+                  checked ? "translate-x-5 bg-cyan-100 shadow-[0_0_16px_rgba(136,247,255,0.46)]" : "translate-x-0"
+                )}
+              />
+            </span>
+            <input type="checkbox" className="hidden" checked={checked} onChange={onChange} />
+          </label>
+        );
+      }
+
+      function ActionButton({ children, onClick, disabled, secondary = false, small = false }) {
+        return (
+          <button
+            onClick={onClick}
+            disabled={disabled}
+            className={cn(
+              "rounded-full font-medium transition duration-200 disabled:cursor-not-allowed disabled:opacity-50",
+              small ? "px-4 py-2.5 text-xs uppercase tracking-[0.24em]" : "px-5 py-3 text-sm",
+              secondary
+                ? "border border-cyan-300/18 bg-white/[0.03] text-cyan-100 hover:border-cyan-300/32 hover:bg-cyan-300/10"
+                : "bg-[linear-gradient(135deg,#b3fbff,#76cbff_42%,#82ffff)] text-slate-950 shadow-[0_0_24px_rgba(136,247,255,0.2)] hover:scale-[1.01] hover:shadow-[0_0_34px_rgba(136,247,255,0.34)]"
+            )}
+          >
+            {children}
+          </button>
+        );
+      }
+
+      function JsonBlock({ data }) {
+        return (
+          <pre className="result-scroll overflow-auto rounded-[1.25rem] border border-white/8 bg-black/28 p-4 text-xs leading-6 text-cyan-100">
+            {JSON.stringify(data, null, 2)}
+          </pre>
+        );
+      }
+
+      function HeroVisual() {
+        return (
+          <div className="relative h-[320px] sm:h-[380px] lg:h-[480px]">
+            <div className="hero-ring" />
+            <div className="hero-core" />
+            <div className="hero-scan" />
+            <svg viewBox="0 0 640 640" className="hero-wire">
+              <defs>
+                <linearGradient id="polyLine" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="rgba(170, 249, 255, 1)" />
+                  <stop offset="55%" stopColor="rgba(118, 185, 255, 0.85)" />
+                  <stop offset="100%" stopColor="rgba(74, 119, 255, 0.55)" />
+                </linearGradient>
+              </defs>
+              <g className="glow" stroke="url(#polyLine)">
+                <polygon points="320,76 164,172 186,368 320,442 452,370 480,176" fill="rgba(8,20,35,0.16)" />
+                <polygon points="320,136 224,196 236,320 320,374 408,324 420,198" fill="rgba(10,30,54,0.1)" />
+                <polyline points="320,76 320,442" />
+                <polyline points="164,172 320,250 480,176" className="dim" />
+                <polyline points="186,368 320,306 452,370" className="dim" />
+                <polyline points="224,196 320,250 420,198" />
+                <polyline points="236,320 320,306 408,324" />
+                <polyline points="224,196 236,320" className="dim" />
+                <polyline points="420,198 408,324" className="dim" />
+                <circle cx="320" cy="250" r="6" fill="rgba(193,251,255,0.95)" />
+                <circle cx="320" cy="306" r="5" fill="rgba(193,251,255,0.82)" />
+              </g>
+            </svg>
+          </div>
+        );
+      }
+
+      function ResourceItem({ url, label, tone = "cyan", actionLabel = null, onAction = null, active = false }) {
+        const toneClass =
+          tone === "green"
+            ? "border-emerald-300/18 bg-emerald-300/10 text-emerald-100 hover:border-emerald-300/34"
+            : "border-cyan-300/16 bg-cyan-300/10 text-cyan-50 hover:border-cyan-300/34";
+        return (
+          <div
+            className={cn(
+              "rounded-[1.2rem] border px-4 py-4 transition",
+              toneClass,
+              active ? "shadow-[0_0_26px_rgba(136,247,255,0.14)] ring-1 ring-cyan-300/30" : ""
+            )}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-sm font-medium">{label}</div>
+                <div className="mt-1 break-all text-xs text-white/54">{url}</div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {actionLabel && onAction ? (
+                  <button
+                    type="button"
+                    onClick={onAction}
+                    className="rounded-full border border-cyan-300/18 bg-cyan-300/10 px-3 py-2 text-[11px] uppercase tracking-[0.22em] text-cyan-50 transition hover:border-cyan-300/36 hover:bg-cyan-300/16"
+                  >
+                    {actionLabel}
+                  </button>
+                ) : null}
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] uppercase tracking-[0.22em] text-white/72 transition hover:border-white/24 hover:text-white"
+                >
+                  ↗
+                </a>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      function App() {
+        const [lang, setLang] = useState("zh");
+        const [health, setHealth] = useState({ ok: false, api_key_configured: false });
+        const [settings, setSettings] = useState({
+          api_key: "",
+          api_key_configured: false,
+          masked_api_key: "",
+          key_format_warning: "",
+          saving: false,
+        });
+        const [tab, setTab] = useState("text");
+        const [busy, setBusy] = useState(false);
+        const [taskId, setTaskId] = useState("");
+        const [taskDetail, setTaskDetail] = useState(null);
+        const [selectedModelUrl, setSelectedModelUrl] = useState("");
+        const [message, setMessage] = useState("");
+        const [textForm, setTextForm] = useState({
+          prompt: defaultTextPrompt,
+          negative_prompt: defaultNegative,
+          model_version: "P1-20260311",
+          face_limit: 20000,
+          texture: false,
+          pbr: false,
+          auto_size: true,
+          quad: false,
+          seed: "",
+        });
+        const [imageForm, setImageForm] = useState({
+          image_url: "",
+          negative_prompt: promptTemplates[4].negative,
+          model_version: "P1-20260311",
+          face_limit: 20000,
+          texture: false,
+          pbr: false,
+          auto_size: true,
+          quad: false,
+          seed: "",
+        });
+        const [imageFile, setImageFile] = useState(null);
+        const [imageGen, setImageGen] = useState({
+          prompt: promptTemplates[5].prompt,
+          negative_prompt: promptTemplates[5].negative,
+          seed: "",
+        });
+
+        const particles = useMemo(randomParticles, []);
+        const L = copy[lang];
+
+        useEffect(() => {
+          fetch("/api/health")
+            .then((r) => r.json())
+            .then(setHealth)
+            .catch(() => setHealth({ ok: false, api_key_configured: false }));
+
+          fetch("/api/settings")
+            .then((r) => r.json())
+            .then((data) =>
+              setSettings((value) => ({
+                ...value,
+                api_key_configured: data.api_key_configured,
+                masked_api_key: data.masked_api_key || "",
+                key_format_warning: data.key_format_warning || "",
+              }))
+            )
+            .catch(() =>
+              setSettings((value) => ({
+                ...value,
+                api_key_configured: false,
+                masked_api_key: "",
+                key_format_warning: "",
+              }))
+            );
+        }, []);
+
+        const selectedTemplateType = tab === "text" ? "text" : tab === "image" ? "image" : "imagegen";
+        const textQuadUnsupported = /^P1/i.test((textForm.model_version || "").trim());
+        const imageQuadUnsupported = /^P1/i.test((imageForm.model_version || "").trim());
+        const previewableModelUrls = useMemo(() => {
+          const urls = taskDetail?.model_urls || [];
+          return urls.filter((url) => {
+            const clean = url.split("?")[0].toLowerCase();
+            return clean.endsWith(".glb") || clean.endsWith(".gltf");
+          });
+        }, [taskDetail]);
+
+        const statusLabel = useMemo(() => {
+          const status = taskDetail?.status;
+          if (status === "success") return L.success;
+          if (status === "failed") return L.failed;
+          if (status === "running") return L.running;
+          return L.idle;
+        }, [taskDetail, L]);
+
+        const statusClass = useMemo(() => {
+          const status = taskDetail?.status;
+          if (status === "success") return "text-emerald-200";
+          if (status === "failed") return "text-rose-200";
+          if (status === "running") return "text-amber-100";
+          return "text-white/74";
+        }, [taskDetail]);
+
+        useEffect(() => {
+          if (!previewableModelUrls.length) {
+            setSelectedModelUrl("");
+            return;
+          }
+          if (!selectedModelUrl || !previewableModelUrls.includes(selectedModelUrl)) {
+            setSelectedModelUrl(previewableModelUrls[0]);
+          }
+        }, [previewableModelUrls, selectedModelUrl]);
+
+        useEffect(() => {
+          if (textQuadUnsupported && textForm.quad) {
+            setTextForm((value) => ({ ...value, quad: false }));
+          }
+        }, [textQuadUnsupported, textForm.quad]);
+
+        useEffect(() => {
+          if (imageQuadUnsupported && imageForm.quad) {
+            setImageForm((value) => ({ ...value, quad: false }));
+          }
+        }, [imageQuadUnsupported, imageForm.quad]);
+
+        const jumpTo = (id) => {
+          const node = document.getElementById(id);
+          if (node) node.scrollIntoView({ behavior: "smooth", block: "start" });
+        };
+
+        const applyTemplate = (item) => {
+          if (item.type === "text") {
+            setTab("text");
+            setTextForm((value) => ({ ...value, prompt: item.prompt, negative_prompt: item.negative }));
+            setMessage(L.messageTemplateText);
+            return;
+          }
+          if (item.type === "image") {
+            setTab("image");
+            setImageForm((value) => ({ ...value, negative_prompt: item.negative }));
+            setMessage(L.messageTemplateImage);
+            return;
+          }
+          setTab("imagegen");
+          setImageGen((value) => ({ ...value, prompt: item.prompt, negative_prompt: item.negative }));
+          setMessage(L.messageTemplateImageGen);
+        };
+
+        const pollTask = async (id) => {
+          const res = await fetch(`/api/tripo/tasks/${id}`);
+          const data = await res.json();
+          setTaskDetail(data);
+          return data;
+        };
+
+        const saveApiKey = async () => {
+          setSettings((value) => ({ ...value, saving: true }));
+          try {
+            const res = await fetch("/api/settings/tripo-key", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ api_key: settings.api_key }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || L.messageSaveError);
+            setSettings((value) => ({
+              ...value,
+              api_key: "",
+              api_key_configured: data.api_key_configured,
+              masked_api_key: data.masked_api_key || "",
+              key_format_warning: data.key_format_warning || "",
+              saving: false,
+            }));
+            setHealth((value) => ({ ...value, api_key_configured: data.api_key_configured }));
+            setMessage(data.api_key_configured ? L.messageSaveSuccess : L.messageSaveCleared);
+          } catch (err) {
+            setSettings((value) => ({ ...value, saving: false }));
+            setMessage(err.message || L.messageSaveError);
+          }
+        };
+
+        const submitText = async () => {
+          setBusy(true);
+          setMessage("");
+          setTaskDetail(null);
+          try {
+            const payload = {
+              ...textForm,
+              face_limit: Number(textForm.face_limit),
+              seed: textForm.seed ? Number(textForm.seed) : null,
+            };
+            const res = await fetch("/api/tripo/text-to-model", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || "Submit failed");
+            setTaskId(data.task_id || "");
+            setMessage(L.messageTextSubmitted);
+            if (data.task_id) await pollTask(data.task_id);
+          } catch (err) {
+            setMessage(err.message || "Submit failed");
+          } finally {
+            setBusy(false);
+          }
+        };
+
+        const submitImage = async () => {
+          setBusy(true);
+          setMessage("");
+          setTaskDetail(null);
+          try {
+            if (!imageFile && !imageForm.image_url.trim()) {
+              throw new Error(L.messageImageSourceMissing);
+            }
+
+            let res;
+            if (imageFile) {
+              const formData = new FormData();
+              formData.append("file", imageFile);
+              Object.entries(imageForm).forEach(([key, value]) => {
+                if (key === "image_url") return;
+                formData.append(key, value === "" ? "" : value);
+              });
+              res = await fetch("/api/tripo/image-upload-to-model", { method: "POST", body: formData });
+            } else {
+              const payload = {
+                ...imageForm,
+                face_limit: Number(imageForm.face_limit),
+                seed: imageForm.seed ? Number(imageForm.seed) : null,
+              };
+              res = await fetch("/api/tripo/image-url-to-model", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              });
+            }
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || "Submit failed");
+            setTaskId(data.task_id || "");
+            setMessage(L.messageImageSubmitted);
+            if (data.task_id) await pollTask(data.task_id);
+          } catch (err) {
+            setMessage(err.message || "Submit failed");
+          } finally {
+            setBusy(false);
+          }
+        };
+
+        const submitTextToImage = async () => {
+          setBusy(true);
+          setMessage("");
+          try {
+            const formData = new FormData();
+            formData.append("prompt", imageGen.prompt);
+            formData.append("negative_prompt", imageGen.negative_prompt || "");
+            if (imageGen.seed) formData.append("seed", imageGen.seed);
+            const res = await fetch("/api/tripo/text-to-image", { method: "POST", body: formData });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || "Submit failed");
+            setTaskId(data.task_id || "");
+            setMessage(L.messageImageGenSubmitted);
+            if (data.task_id) await pollTask(data.task_id);
+          } catch (err) {
+            setMessage(err.message || "Submit failed");
+          } finally {
+            setBusy(false);
+          }
+        };
+
+        return (
+          <div className="relative min-h-screen">
+            <ParticleField particles={particles} />
+
+            <div className="relative mx-auto max-w-[1480px] px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
+              <header className="mb-6 rounded-[1.6rem] panel-glass px-5 py-4">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-300/10 shadow-glow">
+                      <span className="font-display text-lg tracking-[0.22em] text-cyan-50">K</span>
+                    </div>
+                    <div>
+                      <div className="font-display text-sm uppercase tracking-[0.44em] text-cyan-100/80">KENYO</div>
+                      <div className="mt-1 text-sm text-white/44">Tripo3D</div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    <StatusPill label={settings.api_key_configured ? L.statusReady : L.statusNeedKey} />
+                    <LanguageToggle lang={lang} setLang={setLang} L={L} />
+                  </div>
+                </div>
+              </header>
+
+              <section className="relative isolate overflow-hidden rounded-[2rem] panel-glass glow-frame px-5 py-8 sm:px-7 sm:py-10 lg:px-10 lg:py-12">
+                <div className="absolute inset-0 blueprint-grid opacity-25" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_68%_24%,rgba(130,246,255,0.14),transparent_22%),radial-gradient(circle_at_76%_60%,rgba(48,104,255,0.2),transparent_30%)]" />
+                <div className="relative grid items-center gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <StatusPill label={L.heroTag} />
+                    </div>
+                    <div className="mt-6 max-w-3xl">
+                      <h1 className="text-4xl font-semibold leading-[1.04] text-white sm:text-5xl lg:text-[4.4rem]">
+                        {L.heroTitle1}
+                        <span className="block text-cyan-100 [text-shadow:0_0_26px_rgba(136,247,255,0.2)]">{L.heroTitle2}</span>
+                      </h1>
+                      <p className="mt-5 max-w-2xl text-sm leading-7 text-white/64 sm:text-base">{L.heroDesc}</p>
+                    </div>
+                    <div className="mt-8 flex flex-wrap items-center gap-3">
+                      <ActionButton onClick={() => jumpTo("workspace")}>{L.heroPrimary}</ActionButton>
+                      <ActionButton secondary onClick={() => jumpTo("results")}>{L.heroSecondary}</ActionButton>
+                    </div>
+                  </div>
+
+                  <div className="relative">
+                    <HeroVisual />
+                  </div>
+                </div>
+              </section>
+
+              <section id="workspace" className="mt-6 grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
+                <aside className="space-y-6">
+                  <div className="rounded-[1.8rem] panel-glass glow-frame p-5">
+                    <div className="font-display text-xs uppercase tracking-[0.38em] text-cyan-100/70">{L.keyEyebrow}</div>
+                    <div className="mt-3 text-xl text-white/90">{L.keyTitle}</div>
+                    <p className="mt-2 text-sm leading-7 text-white/56">{L.keyDesc}</p>
+
+                    <div className="mt-5 space-y-4">
+                      <Field label={L.keyLabel}>
+                        <input
+                          type="password"
+                          className="cyber-input"
+                          value={settings.api_key}
+                          onChange={(e) => setSettings((value) => ({ ...value, api_key: e.target.value }))}
+                          placeholder={L.keyPlaceholder}
+                        />
+                      </Field>
+
+                      <div className="rounded-[1.2rem] border border-white/8 bg-white/[0.03] px-4 py-4">
+                        <div className="text-[11px] uppercase tracking-[0.28em] text-white/34">{L.keyStored}</div>
+                        <div className="mt-2 break-all font-mono text-sm text-cyan-100/84">
+                          {settings.masked_api_key || L.keyNotSet}
+                        </div>
+                        <div className="mt-2 text-xs leading-6 text-white/42">{L.keyHint}</div>
+                      </div>
+
+                      {settings.key_format_warning ? (
+                        <div className="rounded-[1.2rem] border border-amber-300/20 bg-amber-300/10 px-4 py-4 text-sm leading-7 text-amber-100/90">
+                          {L.keyFormatWarning}
+                        </div>
+                      ) : null}
+
+                      <ActionButton onClick={saveApiKey} disabled={settings.saving}>
+                        {settings.saving ? L.keySaving : L.keySave}
+                      </ActionButton>
+                    </div>
+                  </div>
+
+                  <CollapsiblePanel
+                    eyebrow={L.templatesEyebrow}
+                    title={L.templatesTitle}
+                    buttonLabel={L.presetsToggle}
+                  >
+                    <div className="space-y-3">
+                      {promptTemplates.map((item) => (
+                        <TemplateCard
+                          key={item.name.en}
+                          item={item}
+                          onApply={applyTemplate}
+                          lang={lang}
+                          active={item.type === selectedTemplateType}
+                        />
+                      ))}
+                    </div>
+                  </CollapsiblePanel>
+
+                  <CollapsiblePanel
+                    eyebrow={L.notesEyebrow}
+                    title={L.notesTitle}
+                    buttonLabel={L.tipsToggle}
+                  >
+                    <div className="space-y-3">
+                      {L.notes.map((item) => (
+                        <div key={item} className="rounded-[1.2rem] border border-white/8 bg-white/[0.03] px-4 py-4 text-sm leading-7 text-white/56">
+                          {item}
+                        </div>
+                      ))}
+                    </div>
+                  </CollapsiblePanel>
+                </aside>
+
+                <main className="space-y-6">
+                  <section className="rounded-[1.8rem] panel-glass glow-frame p-4 sm:p-5">
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                      {[
+                        ["text", L.tabs.text, L.tabDesc.text],
+                        ["image", L.tabs.image, L.tabDesc.image],
+                        ["imagegen", L.tabs.imagegen, L.tabDesc.imagegen],
+                      ].map(([key, label, desc]) => (
+                        <button
+                          key={key}
+                          onClick={() => setTab(key)}
+                          className={cn(
+                            "rounded-[1.3rem] border px-4 py-4 text-left transition",
+                            tab === key
+                              ? "border-cyan-300/30 bg-cyan-300/12 text-cyan-50 shadow-glow"
+                              : "border-white/8 bg-white/[0.03] text-white/64 hover:border-cyan-300/18 hover:text-white/88"
+                          )}
+                        >
+                          <div className="font-medium">{label}</div>
+                          <div className="mt-1 text-xs leading-5 text-white/42">{desc}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+
+                  {tab === "text" && (
+                    <section className="rounded-[1.8rem] panel-glass glow-frame p-5 sm:p-6">
+                      <div className="space-y-5">
+                        <div>
+                          <div className="font-display text-xs uppercase tracking-[0.38em] text-cyan-100/68">{L.textEyebrow}</div>
+                          <h2 className="mt-3 text-2xl font-semibold text-white/92">{L.textTitle}</h2>
+                          <p className="mt-2 text-sm leading-7 text-white/50">{L.textDesc}</p>
+                        </div>
+
+                        <Field label={L.promptLabel} hint={L.promptHint}>
+                          <textarea
+                            className="cyber-textarea"
+                            value={textForm.prompt}
+                            onChange={(e) => setTextForm((value) => ({ ...value, prompt: e.target.value }))}
+                          />
+                        </Field>
+
+                        <Field label={L.negativeLabel} hint={L.negativeHint}>
+                          <textarea
+                            className="cyber-textarea"
+                            value={textForm.negative_prompt}
+                            onChange={(e) => setTextForm((value) => ({ ...value, negative_prompt: e.target.value }))}
+                          />
+                        </Field>
+
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                          <Field label={L.modelVersion}>
+                            <input
+                              className="cyber-input"
+                              value={textForm.model_version}
+                              onChange={(e) => setTextForm((value) => ({ ...value, model_version: e.target.value }))}
+                            />
+                          </Field>
+                          <Field label={L.faceLimit}>
+                            <input
+                              type="number"
+                              className="cyber-input"
+                              value={textForm.face_limit}
+                              onChange={(e) => setTextForm((value) => ({ ...value, face_limit: e.target.value }))}
+                            />
+                          </Field>
+                          <Field label={L.seed}>
+                            <input
+                              type="number"
+                              className="cyber-input"
+                              value={textForm.seed}
+                              onChange={(e) => setTextForm((value) => ({ ...value, seed: e.target.value }))}
+                              placeholder={L.seedPlaceholder}
+                            />
+                          </Field>
+                        </div>
+
+                        <div>
+                          <div className="mb-3 text-sm font-medium text-white/88">{L.togglesTitle}</div>
+                          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                            <ToggleTile label={L.toggleTexture} checked={textForm.texture} onChange={(e) => setTextForm((value) => ({ ...value, texture: e.target.checked }))} />
+                            <ToggleTile label={L.togglePbr} checked={textForm.pbr} onChange={(e) => setTextForm((value) => ({ ...value, pbr: e.target.checked }))} />
+                            <ToggleTile label={L.toggleAutoSize} checked={textForm.auto_size} onChange={(e) => setTextForm((value) => ({ ...value, auto_size: e.target.checked }))} />
+                            <ToggleTile label={L.toggleQuad} checked={textForm.quad} onChange={(e) => setTextForm((value) => ({ ...value, quad: e.target.checked }))} />
+                          </div>
+                          {textQuadUnsupported ? <div className="mt-3 text-xs leading-6 text-amber-100/80">{L.quadUnsupported}</div> : null}
+                        </div>
+
+                        <details className="group rounded-[1.25rem] border border-white/8 bg-white/[0.03] p-4">
+                          <summary className="cursor-pointer list-none text-sm font-medium text-white/82">{L.textGuideTitle}</summary>
+                          <div className="mt-4 space-y-3 text-sm leading-7 text-white/56">
+                            {L.textGuideItems.map((item) => (
+                              <div key={item} className="rounded-[1rem] border border-white/8 bg-black/18 p-3">
+                                {item}
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+
+                        <div className="pt-1">
+                          <ActionButton onClick={submitText} disabled={busy}>
+                            {busy ? L.busy : L.submitText}
+                          </ActionButton>
+                        </div>
+                      </div>
+                    </section>
+                  )}
+
+                  {tab === "image" && (
+                    <section className="rounded-[1.8rem] panel-glass glow-frame p-5 sm:p-6">
+                      <div className="space-y-5">
+                        <div>
+                          <div className="font-display text-xs uppercase tracking-[0.38em] text-cyan-100/68">{L.imageEyebrow}</div>
+                          <h2 className="mt-3 text-2xl font-semibold text-white/92">{L.imageTitle}</h2>
+                          <p className="mt-2 text-sm leading-7 text-white/50">{L.imageDesc}</p>
+                        </div>
+
+                        <div className="grid gap-4 lg:grid-cols-2">
+                          <Field label={L.uploadLabel} hint={L.uploadHint}>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="cyber-file"
+                              onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                            />
+                          </Field>
+                          <Field label={L.urlLabel} hint={L.urlHint}>
+                            <input
+                              className="cyber-input"
+                              value={imageForm.image_url}
+                              onChange={(e) => setImageForm((value) => ({ ...value, image_url: e.target.value }))}
+                              placeholder={L.urlPlaceholder}
+                            />
+                          </Field>
+                        </div>
+
+                        <Field label={L.negativeLabel} hint={L.negativeHint}>
+                          <textarea
+                            className="cyber-textarea"
+                            value={imageForm.negative_prompt}
+                            onChange={(e) => setImageForm((value) => ({ ...value, negative_prompt: e.target.value }))}
+                          />
+                        </Field>
+
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                          <Field label={L.modelVersion}>
+                            <input
+                              className="cyber-input"
+                              value={imageForm.model_version}
+                              onChange={(e) => setImageForm((value) => ({ ...value, model_version: e.target.value }))}
+                            />
+                          </Field>
+                          <Field label={L.faceLimit}>
+                            <input
+                              type="number"
+                              className="cyber-input"
+                              value={imageForm.face_limit}
+                              onChange={(e) => setImageForm((value) => ({ ...value, face_limit: e.target.value }))}
+                            />
+                          </Field>
+                          <Field label={L.seed}>
+                            <input
+                              type="number"
+                              className="cyber-input"
+                              value={imageForm.seed}
+                              onChange={(e) => setImageForm((value) => ({ ...value, seed: e.target.value }))}
+                              placeholder={L.seedPlaceholder}
+                            />
+                          </Field>
+                        </div>
+
+                        <div>
+                          <div className="mb-3 text-sm font-medium text-white/88">{L.togglesTitle}</div>
+                          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                            <ToggleTile label={L.toggleTexture} checked={imageForm.texture} onChange={(e) => setImageForm((value) => ({ ...value, texture: e.target.checked }))} />
+                            <ToggleTile label={L.togglePbr} checked={imageForm.pbr} onChange={(e) => setImageForm((value) => ({ ...value, pbr: e.target.checked }))} />
+                            <ToggleTile label={L.toggleAutoSize} checked={imageForm.auto_size} onChange={(e) => setImageForm((value) => ({ ...value, auto_size: e.target.checked }))} />
+                            <ToggleTile label={L.toggleQuad} checked={imageForm.quad} onChange={(e) => setImageForm((value) => ({ ...value, quad: e.target.checked }))} />
+                          </div>
+                          {imageQuadUnsupported ? <div className="mt-3 text-xs leading-6 text-amber-100/80">{L.quadUnsupported}</div> : null}
+                        </div>
+
+                        <details className="group rounded-[1.25rem] border border-white/8 bg-white/[0.03] p-4">
+                          <summary className="cursor-pointer list-none text-sm font-medium text-white/82">{L.imageGuideTitle}</summary>
+                          <div className="mt-4 space-y-3 text-sm leading-7 text-white/56">
+                            {L.imageGuideItems.map((item) => (
+                              <div key={item} className="rounded-[1rem] border border-white/8 bg-black/18 p-3">
+                                {item}
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+
+                        <div className="pt-1">
+                          <ActionButton onClick={submitImage} disabled={busy}>
+                            {busy ? L.busy : L.submitImage}
+                          </ActionButton>
+                        </div>
+                      </div>
+                    </section>
+                  )}
+
+                  {tab === "imagegen" && (
+                    <section className="rounded-[1.8rem] panel-glass glow-frame p-5 sm:p-6">
+                      <div className="space-y-5">
+                        <div>
+                          <div className="font-display text-xs uppercase tracking-[0.38em] text-cyan-100/68">{L.imageGenEyebrow}</div>
+                          <h2 className="mt-3 text-2xl font-semibold text-white/92">{L.imageGenTitle}</h2>
+                          <p className="mt-2 text-sm leading-7 text-white/50">{L.imageGenDesc}</p>
+                        </div>
+
+                        <Field label={L.promptLabel} hint={L.promptHint}>
+                          <textarea
+                            className="cyber-textarea"
+                            value={imageGen.prompt}
+                            onChange={(e) => setImageGen((value) => ({ ...value, prompt: e.target.value }))}
+                          />
+                        </Field>
+
+                        <Field label={L.negativeLabel} hint={L.negativeHint}>
+                          <textarea
+                            className="cyber-textarea"
+                            value={imageGen.negative_prompt}
+                            onChange={(e) => setImageGen((value) => ({ ...value, negative_prompt: e.target.value }))}
+                          />
+                        </Field>
+
+                        <Field label={L.seed}>
+                          <input
+                            type="number"
+                            className="cyber-input"
+                            value={imageGen.seed}
+                            onChange={(e) => setImageGen((value) => ({ ...value, seed: e.target.value }))}
+                            placeholder={L.seedPlaceholder}
+                          />
+                        </Field>
+
+                        <details className="group rounded-[1.25rem] border border-white/8 bg-white/[0.03] p-4">
+                          <summary className="cursor-pointer list-none text-sm font-medium text-white/82">{L.imageGenGuideTitle}</summary>
+                          <div className="mt-4 space-y-3 text-sm leading-7 text-white/56">
+                            {L.imageGenGuideItems.map((item) => (
+                              <div key={item} className="rounded-[1rem] border border-white/8 bg-black/18 p-3">
+                                {item}
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+
+                        <div className="pt-1">
+                          <ActionButton onClick={submitTextToImage} disabled={busy}>
+                            {busy ? L.busy : L.submitImageGen}
+                          </ActionButton>
+                        </div>
+                      </div>
+                    </section>
+                  )}
+
+                  <section id="results" className="rounded-[1.8rem] panel-glass glow-frame p-5 sm:p-6">
+                    <div className="grid gap-5 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+                      <div className="space-y-4">
+                        <div>
+                          <div className="font-display text-xs uppercase tracking-[0.38em] text-cyan-100/70">{L.resultsEyebrow}</div>
+                          <h2 className="mt-3 text-2xl font-semibold text-white/92">{L.resultsTitle}</h2>
+                          <p className="mt-2 text-sm leading-7 text-white/54">{L.resultsDesc}</p>
+                        </div>
+
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="rounded-[1.3rem] border border-white/8 bg-white/[0.03] p-4">
+                            <div className="text-[11px] uppercase tracking-[0.28em] text-white/34">{L.taskId}</div>
+                            <div className="mt-3 break-all font-mono text-sm text-cyan-100/88">{taskId || "—"}</div>
+                          </div>
+                          <div className="rounded-[1.3rem] border border-white/8 bg-white/[0.03] p-4">
+                            <div className="text-[11px] uppercase tracking-[0.28em] text-white/34">{L.status}</div>
+                            <div className={cn("mt-3 text-lg font-medium", statusClass)}>{statusLabel}</div>
+                          </div>
+                        </div>
+
+                        <div className="rounded-[1.3rem] border border-white/8 bg-white/[0.03] p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <div className="text-[11px] uppercase tracking-[0.28em] text-white/34">{L.feedback}</div>
+                              <div className="mt-2 text-sm leading-7 text-white/64">
+                                {message || L.noOutput}
+                              </div>
+                            </div>
+                            {taskId ? (
+                              <ActionButton small secondary onClick={() => pollTask(taskId)}>
+                                {L.refresh}
+                              </ActionButton>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-5">
+                        <div className="rounded-[1.35rem] border border-white/8 bg-black/22 p-4">
+                          <div className="mb-3 text-sm font-medium text-white/86">{L.viewer}</div>
+                          <div className="mb-4 text-sm leading-7 text-white/54">{L.viewerDesc}</div>
+                          {selectedModelUrl ? (
+                            <div className="overflow-hidden rounded-[1.2rem] border border-cyan-300/14 bg-black/30">
+                              <div className="flex items-center justify-between gap-3 border-b border-white/8 px-4 py-3 text-xs uppercase tracking-[0.22em] text-white/46">
+                                <span>{L.viewerHint}</span>
+                                <a
+                                  href={selectedModelUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="rounded-full border border-cyan-300/18 bg-cyan-300/10 px-3 py-1.5 text-cyan-50 transition hover:border-cyan-300/34 hover:bg-cyan-300/16"
+                                >
+                                  ↗
+                                </a>
+                              </div>
+                              <div className="h-[360px]">
+                                <model-viewer
+                                  src={selectedModelUrl}
+                                  camera-controls
+                                  touch-action="pan-y"
+                                  auto-rotate
+                                  shadow-intensity="1"
+                                  exposure="1.1"
+                                  environment-image="neutral"
+                                ></model-viewer>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="rounded-[1.2rem] border border-dashed border-cyan-300/18 bg-cyan-300/6 p-6 text-sm leading-7 text-white/52">
+                              {L.viewerEmpty}
+                            </div>
+                          )}
+                        </div>
+
+                        {taskDetail?.preview_urls?.length ? (
+                          <div>
+                            <div className="mb-3 text-sm font-medium text-white/86">{L.preview}</div>
+                            <div className="grid gap-3">
+                              {taskDetail.preview_urls.slice(0, 4).map((url, index) => (
+                                <ResourceItem key={url} url={url} label={`${L.openPreview} ${index + 1}`} />
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {taskDetail?.model_urls?.length ? (
+                          <div>
+                            <div className="mb-3 text-sm font-medium text-white/86">{L.models}</div>
+                            <div className="grid gap-3">
+                              {taskDetail.model_urls.map((url, index) => (
+                                <ResourceItem
+                                  key={url}
+                                  url={url}
+                                  label={`${L.downloadModel} ${index + 1}`}
+                                  tone="green"
+                                  actionLabel={
+                                    previewableModelUrls.includes(url) ? L.previewModel : null
+                                  }
+                                  onAction={
+                                    previewableModelUrls.includes(url)
+                                      ? () => setSelectedModelUrl(url)
+                                      : null
+                                  }
+                                  active={selectedModelUrl === url}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {taskDetail?.raw ? (
+                          <details className="group rounded-[1.35rem] border border-white/8 bg-black/22 p-4" open>
+                            <summary className="cursor-pointer list-none text-sm font-medium text-white/86">{L.jsonTitle}</summary>
+                            <div className="mt-4">
+                              <JsonBlock data={taskDetail.raw} />
+                            </div>
+                          </details>
+                        ) : (
+                          <div className="rounded-[1.35rem] border border-dashed border-cyan-300/18 bg-cyan-300/6 p-6 text-sm leading-7 text-white/52">
+                            {L.noOutput}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </section>
+                </main>
+              </section>
+            </div>
+          </div>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    </script>
+  </body>
+</html>
