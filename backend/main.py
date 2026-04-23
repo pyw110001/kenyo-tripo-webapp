@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 FRONTEND_DIR = os.path.join(PROJECT_ROOT, "frontend")
+SCHEMA_FILE = os.path.join(PROJECT_ROOT, "schema.html")
 ENV_FILE = os.path.join(PROJECT_ROOT, ".env")
 
 
@@ -507,3 +508,10 @@ async def get_task(task_id: str) -> TaskSummary:
 @app.get("/")
 async def index():
     return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+
+
+@app.get("/schema.html")
+async def schema_page():
+    if not os.path.isfile(SCHEMA_FILE):
+        raise HTTPException(status_code=404, detail="schema.html not found")
+    return FileResponse(SCHEMA_FILE)
