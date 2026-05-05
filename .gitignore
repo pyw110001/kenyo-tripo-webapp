@@ -7,3 +7,5 @@ uvicorn.stdout.log
 uvicorn.stderr.log
 .DS_Store
 Thumbs.db
+
+.vercel
