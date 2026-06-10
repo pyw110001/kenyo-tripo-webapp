@@ -1,6 +1,7 @@
 .env
 .venv/
 .pydeps/
+.pydeps310/
 __pycache__/
 *.pyc
 uvicorn.stdout.log
@@ -9,3 +10,4 @@ uvicorn.stderr.log
 Thumbs.db
 
 .vercel
+outputs/
