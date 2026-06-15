@@ -16,6 +16,8 @@ from pydantic import BaseModel, Field
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 FRONTEND_DIR = os.path.join(PROJECT_ROOT, "frontend")
+FRONTEND_DIST_DIR = os.path.join(FRONTEND_DIR, "dist")
+FRONTEND_DIST_ASSETS_DIR = os.path.join(FRONTEND_DIST_DIR, "assets")
 SCHEMA_FILE = os.path.join(PROJECT_ROOT, "schema.html")
 ENV_FILE = os.path.join(PROJECT_ROOT, ".env")
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, "outputs")
@@ -117,7 +119,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-if os.path.isdir(FRONTEND_DIR):
+if os.path.isdir(FRONTEND_DIST_ASSETS_DIR):
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST_ASSETS_DIR), name="assets")
+elif os.path.isdir(FRONTEND_DIR):
     app.mount("/assets", StaticFiles(directory=FRONTEND_DIR), name="assets")
 
 app.mount("/outputs", StaticFiles(directory=OUTPUT_DIR), name="outputs")
@@ -345,11 +349,6 @@ async def _upload_bytes_to_tripo(file_name: str, file_bytes: bytes, content_type
     if not TRIPO_API_KEY:
         raise HTTPException(status_code=500, detail="TRIPO_API_KEY 尚未配置")
     file_ext = file_ext or (os.path.splitext(file_name or "")[1] or "").lower().replace(".", "")
-    try:
-        return await _upload_bytes_to_tripo_via_sts(file_name, file_bytes, content_type, file_ext)
-    except Exception:
-        pass
-
     form = {"file": (file_name, file_bytes, content_type)}
     headers = {"Authorization": f"Bearer {TRIPO_API_KEY}"}
     try:
@@ -386,10 +385,6 @@ def _build_uploaded_file_variants(uploaded: Dict[str, Any]) -> List[Dict[str, An
         if cleaned and cleaned not in candidates:
             candidates.append(cleaned)
 
-    if uploaded.get("object"):
-        add_candidate({"type": file_type, "object": uploaded["object"]})
-        add_candidate({"object": uploaded["object"]})
-
     if token_value:
         add_candidate({"type": file_type, "file_token": token_value})
         add_candidate({"file_token": token_value})
@@ -408,17 +403,25 @@ def _build_uploaded_file_variants(uploaded: Dict[str, Any]) -> List[Dict[str, An
 def _build_image_to_model_payload(
     negative_prompt: Optional[str] = "",
     model_version: Optional[str] = None,
+    face_limit: int = 20000,
+    texture: bool = False,
+    pbr: bool = False,
+    auto_size: bool = True,
     style: Optional[str] = None,
     quad: bool = False,
     seed: Optional[int] = None,
 ) -> Dict[str, Any]:
-    payload: Dict[str, Any] = {"type": "image_to_model"}
-    negative = (negative_prompt or "").strip()
     version = (model_version or "").strip()
-    if negative:
-        payload["negative_prompt"] = negative
-    if version and version != "P1-20260311":
-        payload["model_version"] = version
+    safe_auto_size = bool(auto_size and (texture or pbr))
+    payload: Dict[str, Any] = {
+        "type": "image_to_model",
+        "negative_prompt": negative_prompt or "",
+        "model_version": version or "P1-20260311",
+        "face_limit": face_limit,
+        "texture": texture,
+        "pbr": pbr,
+        "auto_size": safe_auto_size,
+    }
     if style:
         payload["style"] = style
     if quad and version and _model_supports_quad(version):
@@ -720,14 +723,20 @@ async def image_upload_to_model(
     base_payload = _build_image_to_model_payload(
         negative_prompt=negative_prompt,
         model_version=model_version,
+        face_limit=face_limit,
+        texture=texture,
+        pbr=pbr,
+        auto_size=auto_size,
         style=style,
         quad=quad,
         seed=seed,
     )
 
     last_exc: Optional[HTTPException] = None
+    attempted_payloads: List[Dict[str, Any]] = []
     for file_payload in _build_uploaded_file_variants(uploaded):
         payload = {**base_payload, "file": file_payload}
+        attempted_payloads.append(payload)
         try:
             data = await _post_json("/task", payload)
             task_id = _first_string_by_keys(data, ["task_id", "id"])
@@ -745,6 +754,7 @@ async def image_upload_to_model(
                 "message": last_exc.detail,
                 "upload": uploaded["raw"],
                 "attempted_file_payloads": _build_uploaded_file_variants(uploaded),
+                "attempted_task_payloads": attempted_payloads,
             },
         )
     raise HTTPException(status_code=500, detail="Image upload failed before task submission")
@@ -762,14 +772,20 @@ async def saved_image_to_model(req: SavedImageToModelRequest) -> Dict[str, Any]:
     base_payload = _build_image_to_model_payload(
         negative_prompt=req.negative_prompt,
         model_version=req.model_version,
+        face_limit=req.face_limit,
+        texture=req.texture,
+        pbr=req.pbr,
+        auto_size=req.auto_size,
         style=req.style,
         quad=req.quad,
         seed=req.seed,
     )
 
     last_exc: Optional[HTTPException] = None
+    attempted_payloads: List[Dict[str, Any]] = []
     for file_payload in _build_uploaded_file_variants(uploaded):
         payload = {**base_payload, "file": file_payload}
+        attempted_payloads.append(payload)
         try:
             data = await _post_json("/task", payload)
             task_id = _first_string_by_keys(data, ["task_id", "id"])
@@ -793,6 +809,7 @@ async def saved_image_to_model(req: SavedImageToModelRequest) -> Dict[str, Any]:
                 "message": last_exc.detail,
                 "upload": uploaded["raw"],
                 "attempted_file_payloads": _build_uploaded_file_variants(uploaded),
+                "attempted_task_payloads": attempted_payloads,
             },
         )
     raise HTTPException(status_code=500, detail="Saved image upload failed before task submission")
@@ -817,6 +834,9 @@ async def get_task(task_id: str) -> TaskSummary:
 
 @app.get("/")
 async def index():
+    dist_index = os.path.join(FRONTEND_DIST_DIR, "index.html")
+    if os.path.isfile(dist_index):
+        return FileResponse(dist_index)
     return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
 
 
