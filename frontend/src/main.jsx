@@ -302,6 +302,45 @@ import './styles.css';
         ]},
       ];
 
+      const surveyEnglishText = {
+        sections: {
+          "一、建筑基本信息": "I. Basic Building Information",
+          "二、外观造型设计": "II. Exterior Form Design",
+          "三、环境与效果图": "III. Environment and Rendering",
+          "报价信息填写": "Quotation Information",
+        },
+        questions: {
+          q1: { title: "1. Site Area", placeholder: "e.g. 120 m2" },
+          q2: { title: "2. Building Length", options: ["A. 10-20m", "B. 20-30m", "C. 30-50m", "D. Exact length"], customPlaceholder: "e.g. 18" },
+          q3: { title: "3. Building Depth / Width", options: ["A. 5-10m", "B. 10-20m", "C. 20-50m", "D. Exact width"], customPlaceholder: "e.g. 9" },
+          q4: { title: "4. Overall Exterior Style", options: ["A. Modern minimalist", "B. Middle Eastern style", "C. Southeast Asian style", "D. Other style"], customPlaceholder: "Enter style" },
+          q5: { title: "5. Building Use", options: ["A. Residential building", "B. Office / factory building", "C. Commercial building"] },
+          q6: { title: "6. Number of Floors", options: ["A. Single-storey building", "B. Two-storey building", "C. Three-storey building", "D. Mixed single / two-storey building"] },
+          q7: { title: "7. Facade Outline", options: ["A. Rectilinear block form", "B. Streamlined curved form", "C. Staggered flowing form", "D. Irregular twisted form"] },
+          q8: { title: "8. Roof Form", options: ["A. Flat roof", "B. Projecting pitched roof", "C. Partial dome", "D. Integrated roof-wall form"] },
+          q9: { title: "9. Roof Material", options: ["A. Brick-red tile roof", "B. Dark gray tile roof", "C. Solar panel roof", "D. Blue metal inward-slope roof"] },
+          q10: { title: "10. Site Environment", options: ["A. Community park environment", "B. Desert environment", "C. Tropical rainforest environment", "D. Cold snowy forest environment"] },
+          q11: { title: "11. Rendering View Angle", options: ["A. Front view", "B. Front-side view", "C. Multi-angle front, side and top view"] },
+          q12: { title: "12. Lighting Atmosphere", options: ["A. High-definition realistic natural light", "B. High-definition daytime sunlight", "C. High-definition sunset light", "D. High-definition night scene"] },
+          qa1: { title: "1. Country and City", placeholder: "e.g. Beijing, China" },
+          qa2: { title: "2. Exact Building Area", placeholder: "e.g. 150 m2" },
+          qa3: { title: "3. Interior Clear Height Requirement", options: ["A. 2.8m", "B. 3m", "C. 3.2m", "D. Custom"], customPlaceholder: "e.g. 3.6" },
+          qa4: { title: "4. Window and Daylighting Requirement", options: ["A. Minimal daylighting, few windows", "B. Normal daylighting and window count", "C. Excellent daylighting, mainly floor-to-ceiling windows"] },
+          qa6: { title: "5. Interior Finish Level", options: ["A. Simple finish", "B. Mid-range finish", "C. Premium finish"] },
+          qa5: { title: "6. Seismic Requirement", options: ["A. Low seismic area, no special requirement", "B. Normal seismic requirement", "C. High seismic area, high-grade seismic design"] },
+          qa10: { title: "7. Foundation Method", options: ["A. Strip foundation", "B. Raft foundation for inland plains", "C. Coastal / desert foundation"] },
+          qa7: { title: "8. Roof Construction Method", options: ["A. Cast-in-place concrete flat roof", "B. Light steel roof structure", "C. Timber tile roof structure"] },
+          qa8: { title: "9. Interior Wall Method", options: ["A. 3D printed interior walls", "B. Lightweight partition interior walls"] },
+          qa9: { title: "10. Others (multiple choices)", options: ["A. Off-grid solar + energy storage system", "B. Water circulation system"] },
+        },
+      };
+
+      const surveySectionTitle = (title, lang) => lang === "en" ? (surveyEnglishText.sections[title] || title) : title;
+      const surveyQuestionTitle = (question, lang) => lang === "en" ? (surveyEnglishText.questions[question.id]?.title || question.title) : question.title;
+      const surveyQuestionPlaceholder = (question, lang) => lang === "en" ? (surveyEnglishText.questions[question.id]?.placeholder || question.placeholder || "") : (question.placeholder || "");
+      const surveyOptionLabel = (question, optionIndex, option, lang) => lang === "en" ? (surveyEnglishText.questions[question.id]?.options?.[optionIndex] || option.label) : option.label;
+      const surveyCustomPlaceholder = (question, option, lang) => lang === "en" ? (surveyEnglishText.questions[question.id]?.customPlaceholder || option.customPlaceholder || "") : (option.customPlaceholder || "");
+
       function valueForQuestion(question, values) {
         if (question.type === "text") return (values[question.id] || "").trim();
         if (question.type === "checkbox") return values[question.id] || [];
@@ -349,22 +388,22 @@ import './styles.css';
         return `为该3D打印建筑报建造总价与清单，建筑情况是：位于${city}，建筑面积${area}，建筑长度${dimensions.lengthText || "未填写"}、宽度${dimensions.widthText || "未填写"}，内部净高${height}，${light}，装修档次为${finish}，${seismic}，基础做法为${foundation}，${roof}，${wall}，其他配置：${extrasText}。`;
       }
 
-      function SurveyQuestion({ question, values, setValues, onAnswered }) {
+      function SurveyQuestion({ question, values, setValues, onAnswered, lang = "zh" }) {
         const setValue = (key, value) => setValues(prev => ({...prev, [key]: value}));
         if (question.type === "text") {
           return (
             <div style={{marginBottom:16}}>
-              <div style={{fontSize:13,fontWeight:600,color:'rgba(225,248,255,0.86)',marginBottom:8}}>{question.title}</div>
-              <input className="line-input" value={values[question.id] || ""} placeholder={question.placeholder || ""}
+              <div style={{fontSize:13,fontWeight:600,color:'rgba(225,248,255,0.86)',marginBottom:8}}>{surveyQuestionTitle(question, lang)}</div>
+              <input className="line-input" value={values[question.id] || ""} placeholder={surveyQuestionPlaceholder(question, lang)}
                 onChange={e=>setValue(question.id, e.target.value)} />
             </div>
           );
         }
         return (
           <div style={{marginBottom:18}}>
-            <div style={{fontSize:13,fontWeight:600,color:'rgba(225,248,255,0.86)',marginBottom:8}}>{question.title}</div>
+            <div style={{fontSize:13,fontWeight:600,color:'rgba(225,248,255,0.86)',marginBottom:8}}>{surveyQuestionTitle(question, lang)}</div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:8}}>
-              {question.options.map(option => {
+              {question.options.map((option, optionIndex) => {
                 const checked = question.type === "checkbox"
                   ? (values[question.id] || []).includes(option.value)
                   : values[question.id] === option.value;
@@ -382,9 +421,9 @@ import './styles.css';
                   <label key={option.label} style={{display:'flex',alignItems:'center',gap:8,borderBottom:'1px solid rgba(0,255,231,0.07)',padding:'8px 0',fontSize:12,color:checked?'var(--c)':'rgba(160,220,235,0.62)',cursor:'pointer'}}>
                     <input type={question.type === "checkbox" ? "checkbox" : "radio"} checked={checked} onChange={toggle}
                       style={{accentColor:'#00ffe7',width:14,height:14}} />
-                    <span>{option.label}</span>
+                    <span>{surveyOptionLabel(question, optionIndex, option, lang)}</span>
                     {option.custom && (
-                      <input className="line-input" value={values[`${question.id}_custom`] || ""} placeholder={option.customPlaceholder || ""}
+                      <input className="line-input" value={values[`${question.id}_custom`] || ""} placeholder={surveyCustomPlaceholder(question, option, lang)}
                         onFocus={()=>setValue(question.id, option.value)}
                         onChange={e=>setValue(`${question.id}_custom`, e.target.value)}
                         style={{padding:'4px 0',fontSize:12,minWidth:0}} />
@@ -967,6 +1006,7 @@ import './styles.css';
 
                   <div ref={surveyQuestionRef} className="survey-question-shell">
                     <SurveyQuestion question={currentSurveyQuestion} values={surveyValues} setValues={setSurveyValues}
+                      lang={lang}
                       onAnswered={surveyStep < surveyQuestions.length - 1 ? () => goToSurveyStep(Math.min(surveyStep + 1, surveyQuestions.length - 1), "next") : null} />
                     <div style={{fontSize:11,color:'rgba(160,220,235,0.42)',fontFamily:'Space Mono',lineHeight:1.7,borderTop:'1px solid rgba(0,255,231,0.08)',paddingTop:14}}>
                       {L.surveyStepHint}
@@ -1280,18 +1320,18 @@ import './styles.css';
                           <div>
                             {designSurveySections.map(section => (
                               <div key={section.title} style={{borderTop:'1px solid var(--line)',paddingTop:16,marginBottom:24}}>
-                                <div className="neon-label" style={{marginBottom:14,opacity:0.65}}>{section.title}</div>
+                                <div className="neon-label" style={{marginBottom:14,opacity:0.65}}>{surveySectionTitle(section.title, lang)}</div>
                                 {section.questions.map(question => (
-                                  <SurveyQuestion key={question.id} question={question} values={surveyValues} setValues={setSurveyValues} />
+                                  <SurveyQuestion key={question.id} question={question} values={surveyValues} setValues={setSurveyValues} lang={lang} />
                                 ))}
                               </div>
                             ))}
 
                             {quoteSurveySections.map(section => (
                               <div key={section.title} style={{borderTop:'1px solid var(--line)',paddingTop:16,marginBottom:24}}>
-                                <div className="neon-label" style={{marginBottom:14,opacity:0.65}}>{section.title}</div>
+                                <div className="neon-label" style={{marginBottom:14,opacity:0.65}}>{surveySectionTitle(section.title, lang)}</div>
                                 {section.questions.map(question => (
-                                  <SurveyQuestion key={question.id} question={question} values={quoteValues} setValues={setQuoteValues} />
+                                  <SurveyQuestion key={question.id} question={question} values={quoteValues} setValues={setQuoteValues} lang={lang} />
                                 ))}
                               </div>
                             ))}
